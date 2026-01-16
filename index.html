@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jewels-AI Studio</title>
+    <script src="https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.0.4/dist/imgly-background-removal.min.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -87,15 +88,9 @@
         .btn-share { background-color: #27ae60; color: white; }
         .btn-share:hover { background-color: #219150; }
 
-        .btn-bg { background-color: #e74c3c; color: white; margin-bottom: 15px; width: 100%; transition: background-color 0.3s; }
+        .btn-bg { background-color: #e74c3c; color: white; margin-bottom: 15px; width: 100%; }
         .btn-bg:hover { background-color: #c0392b; }
-        
-        /* Disabled Button Style */
-        .btn-bg:disabled { 
-            background-color: #bdc3c7; 
-            cursor: not-allowed; 
-            opacity: 0.7;
-        }
+        .btn-bg:disabled { background-color: #e6b0aa; cursor: wait; }
 
         /* Rename Input */
         .rename-input {
@@ -116,7 +111,7 @@
             margin-top: 10px;
             border: 1px solid #ddd;
             display: none;
-            background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAOwgAADsIBFShKgAAAABp0RVh0U29mdHdhcmUAUGFpbnQuTkVUIHYzLjUuMTAw9HKhAAAAFElEQVQ4T2NTgIP/OPABRf//DQApldl5OHdCDAAAAABJRU5ErkJggg==');
+            background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAOwgAADsIBFShKgAAAABp0RVh0U29mdHdhcmUAUGFpbnQuTkVUIHYzLjUuMTAw9HKhAAAAFElEQVQ4T2NTgIP/OPABRf//DQApldl5OHdCDAAAAABJRU5ErkJggg=='); /* Checkerboard for transparency */
         }
 
         .stats {
@@ -161,9 +156,9 @@
 
     <div class="controls" id="controlsArea">
         
-        <button id="bgBtn" class="btn btn-bg" onclick="handleRemoveBackground()" disabled>
+        <button id="bgBtn" class="btn btn-bg" onclick="removeBackground()">
             <div id="spinner" class="spinner"></div> 
-            <span id="bgBtnText">⏳ Initializing AI... (Please Wait)</span>
+            <span id="bgBtnText">✨ Remove Background (AI)</span>
         </button>
 
         <div class="control-group">
@@ -195,22 +190,6 @@
     </div>
 </div>
 
-<script type="module">
-    import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.0.4/+esm';
-    
-    // Attach function to window
-    window.removeBgAI = removeBackground;
-    
-    // Unlock the button because AI is ready!
-    const btn = document.getElementById('bgBtn');
-    const txt = document.getElementById('bgBtnText');
-    if(btn) {
-        btn.disabled = false;
-        txt.innerText = "✨ Remove Background (AI)";
-        btn.style.backgroundColor = "#e74c3c"; // restore color
-    }
-</script>
-
 <script>
     const fileInput = document.getElementById('fileInput');
     const canvas = document.getElementById('previewCanvas');
@@ -223,12 +202,13 @@
     const bgBtnText = document.getElementById('bgBtnText');
     const spinner = document.getElementById('spinner');
 
+    // Sliders
     const sBright = document.getElementById('brightness');
     const sSat = document.getElementById('saturation');
     const sQual = document.getElementById('quality');
 
     let originalImg = new Image();
-    let currentImg = null;
+    let currentImg = null; // The image currently being processed (original or bg-removed)
     let originalFileSize = 0;
     let isTransparent = false;
 
@@ -238,6 +218,7 @@
             const file = e.target.files[0];
             originalFileSize = file.size;
             
+            // Set default filename
             const nameWithoutExt = file.name.split('.').slice(0, -1).join('.');
             filenameInput.value = nameWithoutExt + "_enhanced";
 
@@ -247,23 +228,15 @@
                     currentImg = originalImg;
                     isTransparent = false;
                     
-                    sBright.value = 100; sSat.value = 100;
+                    // Reset sliders
+                    sBright.value = 100; 
+                    sSat.value = 100;
                     
+                    // Show interface
                     canvas.style.display = 'block';
                     controlsArea.style.display = 'block';
                     statsText.style.display = 'block';
-                    bgBtn.style.display = "flex"; 
                     
-                    // Check if AI is already ready from the module script
-                    if (window.removeBgAI) {
-                         bgBtn.disabled = false;
-                         bgBtnText.innerText = "✨ Remove Background (AI)";
-                    } else {
-                        // Keep disabled if still loading
-                         bgBtn.disabled = true;
-                         bgBtnText.innerText = "⏳ Initializing AI... (Please Wait)";
-                    }
-
                     renderImage();
                 }
                 originalImg.src = event.target.result;
@@ -273,42 +246,34 @@
     });
 
     // 2. Remove Background Logic
-    async function handleRemoveBackground() {
+    async function removeBackground() {
         if (!currentImg) return;
 
-        // Double check AI status
-        if (!window.removeBgAI) {
-            alert("Please wait a few more seconds for the AI to finish loading.");
-            return;
-        }
-
+        // UI Updates
         bgBtn.disabled = true;
         bgBtnText.innerText = "Processing... (approx 5-10s)";
         spinner.style.display = "block";
 
         try {
-            // Configuration to fetch models from a reliable public server
-            const config = {
-                publicPath: "https://cdn.jsdelivr.net/npm/@imgly/background-removal-data@1.0.4/dist/",
-                debug: true // Enable debug logging
-            };
-
-            // Run the AI
-            const blob = await window.removeBgAI(currentImg, config);
+            // Run imgly AI
+            const blob = await imgly.removeBackground(currentImg);
             const url = URL.createObjectURL(blob);
             
             const newImg = new Image();
             newImg.onload = () => {
                 currentImg = newImg;
-                isTransparent = true;
-                bgBtn.style.display = "none"; // Remove button after success
+                isTransparent = true; // Switch mode to PNG
+                
+                // UI Reset
+                bgBtn.style.display = "none"; // Hide button after use
                 renderImage();
+                alert("Background Removed Successfully!");
             };
             newImg.src = url;
 
         } catch (error) {
             console.error(error);
-            alert(`Error: ${error.message}\nTry checking your internet connection.`);
+            alert("Error removing background. Please try a simpler image or use Chrome/Safari.");
             bgBtn.disabled = false;
             bgBtnText.innerText = "✨ Remove Background (AI)";
             spinner.style.display = "none";
@@ -321,6 +286,7 @@
 
     // 4. Main Rendering Logic
     function renderImage() {
+        // Update labels
         document.getElementById('val-bright').innerText = sBright.value + "%";
         document.getElementById('val-sat').innerText = sSat.value + "%";
         document.getElementById('val-qual').innerText = sQual.value + "%";
@@ -330,6 +296,7 @@
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
+        // Apply filters
         ctx.filter = `brightness(${sBright.value}%) saturate(${sSat.value}%)`;
         ctx.drawImage(currentImg, 0, 0, canvas.width, canvas.height);
 
@@ -337,11 +304,14 @@
     }
 
     function updateDownloadLink() {
+        // Choose format based on transparency
         const format = isTransparent ? 'image/png' : 'image/jpeg';
         const qualityDecimal = sQual.value / 100;
         
+        // Convert canvas to URL
         const dataUrl = canvas.toDataURL(format, qualityDecimal);
 
+        // Update Download Button
         let ext = isTransparent ? '.png' : '.jpg';
         let name = filenameInput.value || "image";
         if (!name.endsWith(ext)) name += ext;
@@ -349,11 +319,12 @@
         downloadBtn.href = dataUrl;
         downloadBtn.download = name;
 
+        // Calculate Size
         estimateSize(dataUrl);
     }
 
     function estimateSize(dataUrl) {
-        const head = 'data:image/jpeg;base64,';
+        const head = 'data:image/jpeg;base64,'; // rough estimate length
         const sizeInBytes = Math.round((dataUrl.length - head.length) * 3 / 4);
         
         const origKB = (originalFileSize / 1024).toFixed(1);
