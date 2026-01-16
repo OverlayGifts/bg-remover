@@ -117,4 +117,247 @@ btn_save.pack(pady=10)
 status_label = tk.Label(app, text="Welcome!", font=font_plain, fg="grey")
 status_label.pack(side="bottom", pady=10)
 
-app.mainloop()
+app.mainloop()<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jewelry Photo Enhancer</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f4f6f8;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            background-color: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            max-width: 600px;
+            width: 100%;
+            text-align: center;
+        }
+
+        h1 { margin-bottom: 5px; color: #2c3e50; }
+        p.subtitle { color: #7f8c8d; margin-bottom: 25px; font-size: 0.9rem; }
+
+        /* Upload Box */
+        .upload-box {
+            border: 2px dashed #bdc3c7;
+            padding: 30px;
+            border-radius: 8px;
+            background-color: #fafafa;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+        .upload-box:hover { border-color: #3498db; background-color: #f0f8ff; }
+        #fileInput { display: none; }
+
+        /* Controls */
+        .controls {
+            display: none; /* Hidden until image loads */
+            text-align: left;
+            margin-top: 20px;
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+        }
+
+        .control-group { margin-bottom: 15px; }
+        label { font-weight: bold; font-size: 0.9rem; display: flex; justify-content: space-between; }
+        
+        input[type=range] {
+            width: 100%;
+            margin-top: 5px;
+            accent-color: #3498db;
+        }
+
+        /* Preview Canvas */
+        canvas {
+            max-width: 100%;
+            height: auto;
+            border-radius: 4px;
+            margin-top: 10px;
+            border: 1px solid #ddd;
+            display: none;
+        }
+
+        /* Stats & Buttons */
+        .stats {
+            margin-top: 15px;
+            font-size: 0.85rem;
+            color: #27ae60;
+            font-weight: bold;
+            background: #e8f8f5;
+            padding: 10px;
+            border-radius: 4px;
+            display: none;
+        }
+
+        .btn {
+            background-color: #2c3e50;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 6px;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        .btn:hover { background-color: #34495e; }
+        .btn:disabled { background-color: #bdc3c7; cursor: not-allowed; }
+
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Jewelry Photo Enhancer</h1>
+    <p class="subtitle">Enhance brightness & color, then compress.</p>
+
+    <div class="upload-box" onclick="document.getElementById('fileInput').click()">
+        <h3>Click to Upload Image</h3>
+        <p style="margin:0; font-size:0.8rem; color:#888;">Supports JPG, PNG</p>
+    </div>
+    <input type="file" id="fileInput" accept="image/*">
+
+    <canvas id="previewCanvas"></canvas>
+
+    <div class="controls" id="controlsArea">
+        
+        <div class="control-group">
+            <label>Brightness <span id="val-bright">100%</span></label>
+            <input type="range" id="brightness" min="50" max="150" value="100">
+        </div>
+
+        <div class="control-group">
+            <label>Color Pop (Saturation) <span id="val-sat">100%</span></label>
+            <input type="range" id="saturation" min="0" max="200" value="100">
+        </div>
+
+        <div class="control-group">
+            <label>Compression Quality <span id="val-qual">85%</span></label>
+            <input type="range" id="quality" min="10" max="100" value="85">
+        </div>
+
+        <div class="stats" id="statsText"></div>
+
+        <a id="downloadBtn" class="btn">Download Enhanced Image</a>
+    </div>
+</div>
+
+<script>
+    const fileInput = document.getElementById('fileInput');
+    const canvas = document.getElementById('previewCanvas');
+    const ctx = canvas.getContext('2d');
+    const controlsArea = document.getElementById('controlsArea');
+    const statsText = document.getElementById('statsText');
+    const downloadBtn = document.getElementById('downloadBtn');
+
+    // Sliders
+    const sBright = document.getElementById('brightness');
+    const sSat = document.getElementById('saturation');
+    const sQual = document.getElementById('quality');
+
+    // Labels
+    const lBright = document.getElementById('val-bright');
+    const lSat = document.getElementById('val-sat');
+    const lQual = document.getElementById('val-qual');
+
+    let originalImg = new Image();
+    let originalFileSize = 0;
+
+    // 1. Handle File Upload
+    fileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            originalFileSize = file.size;
+            
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                originalImg.onload = () => {
+                    // Reset sliders
+                    sBright.value = 100; lBright.innerText = "100%";
+                    sSat.value = 100; lSat.innerText = "100%";
+                    
+                    // Show interface
+                    canvas.style.display = 'block';
+                    controlsArea.style.display = 'block';
+                    statsText.style.display = 'block';
+                    
+                    renderImage();
+                }
+                originalImg.src = event.target.result;
+            }
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // 2. Handle Sliders
+    [sBright, sSat, sQual].forEach(slider => {
+        slider.addEventListener('input', renderImage);
+    });
+
+    // 3. Main Rendering Logic
+    function renderImage() {
+        // Update Label Text
+        lBright.innerText = sBright.value + "%";
+        lSat.innerText = sSat.value + "%";
+        lQual.innerText = sQual.value + "%";
+
+        // Set Canvas Size
+        canvas.width = originalImg.width;
+        canvas.height = originalImg.height;
+
+        // Apply Filters (Brightness & Saturation)
+        // Note: CSS filters use % (e.g. 100%), Canvas context uses string
+        ctx.filter = `brightness(${sBright.value}%) saturate(${sSat.value}%)`;
+        
+        // Draw Image
+        ctx.drawImage(originalImg, 0, 0, canvas.width, canvas.height);
+
+        // Generate Compressed Output
+        const qualityDecimal = sQual.value / 100;
+        const dataUrl = canvas.toDataURL('image/jpeg', qualityDecimal);
+
+        // Update Download Link
+        downloadBtn.href = dataUrl;
+        downloadBtn.download = "enhanced-jewelry.jpg";
+
+        // Calculate Size Stats
+        estimateSize(dataUrl);
+    }
+
+    function estimateSize(dataUrl) {
+        // Rough calculation of base64 size in bytes
+        const head = 'data:image/jpeg;base64,';
+        const sizeInBytes = Math.round((dataUrl.length - head.length) * 3 / 4);
+        
+        const origKB = (originalFileSize / 1024).toFixed(1);
+        const newKB = (sizeInBytes / 1024).toFixed(1);
+        const reduction = (100 - (sizeInBytes / originalFileSize) * 100).toFixed(0);
+
+        // Color logic for text
+        let color = reduction > 0 ? "green" : "red";
+        let sign = reduction > 0 ? "-" : "+";
+
+        statsText.innerHTML = `
+            Original: ${origKB} KB <br>
+            New Size: <b>${newKB} KB</b> (<span style="color:${color}">${sign}${Math.abs(reduction)}%</span>)
+        `;
+    }
+</script>
+
+</body>
+</html>
