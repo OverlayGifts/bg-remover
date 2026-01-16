@@ -1,244 +1,120 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jewelry Photo Enhancer</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f4f6f8;
-            color: #333;
-            margin: 0;
-            padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
+import tkinter as tk
+from tkinter import filedialog, messagebox, Scale, HORIZONTAL
+from PIL import Image, ImageEnhance, ImageTk
+import os
 
-        .container {
-            background-color: white;
-            padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            max-width: 600px;
-            width: 100%;
-            text-align: center;
-        }
+# Global variables to store image objects
+original_image = None
+processed_image = None
+tk_image = None
 
-        h1 { margin-bottom: 5px; color: #2c3e50; }
-        p.subtitle { color: #7f8c8d; margin-bottom: 25px; font-size: 0.9rem; }
-
-        /* Upload Box */
-        .upload-box {
-            border: 2px dashed #bdc3c7;
-            padding: 30px;
-            border-radius: 8px;
-            background-color: #fafafa;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin-bottom: 20px;
-        }
-        .upload-box:hover { border-color: #3498db; background-color: #f0f8ff; }
-        #fileInput { display: none; }
-
-        /* Controls */
-        .controls {
-            display: none; /* Hidden until image loads */
-            text-align: left;
-            margin-top: 20px;
-            border-top: 1px solid #eee;
-            padding-top: 20px;
-        }
-
-        .control-group { margin-bottom: 15px; }
-        label { font-weight: bold; font-size: 0.9rem; display: flex; justify-content: space-between; }
-        
-        input[type=range] {
-            width: 100%;
-            margin-top: 5px;
-            accent-color: #3498db;
-        }
-
-        /* Preview Canvas */
-        canvas {
-            max-width: 100%;
-            height: auto;
-            border-radius: 4px;
-            margin-top: 10px;
-            border: 1px solid #ddd;
-            display: none;
-        }
-
-        /* Stats & Buttons */
-        .stats {
-            margin-top: 15px;
-            font-size: 0.85rem;
-            color: #27ae60;
-            font-weight: bold;
-            background: #e8f8f5;
-            padding: 10px;
-            border-radius: 4px;
-            display: none;
-        }
-
-        .btn {
-            background-color: #2c3e50;
-            color: white;
-            padding: 12px 24px;
-            border-radius: 6px;
-            text-decoration: none;
-            display: inline-block;
-            margin-top: 20px;
-            font-weight: bold;
-            cursor: pointer;
-            border: none;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        .btn:hover { background-color: #34495e; }
-        .btn:disabled { background-color: #bdc3c7; cursor: not-allowed; }
-
-    </style>
-</head>
-<body>
-
-<div class="container">
-    <h1>Jewelry Photo Enhancer</h1>
-    <p class="subtitle">Enhance brightness & color, then compress.</p>
-
-    <div class="upload-box" onclick="document.getElementById('fileInput').click()">
-        <h3>Click to Upload Image</h3>
-        <p style="margin:0; font-size:0.8rem; color:#888;">Supports JPG, PNG</p>
-    </div>
-    <input type="file" id="fileInput" accept="image/*">
-
-    <canvas id="previewCanvas"></canvas>
-
-    <div class="controls" id="controlsArea">
-        
-        <div class="control-group">
-            <label>Brightness <span id="val-bright">100%</span></label>
-            <input type="range" id="brightness" min="50" max="150" value="100">
-        </div>
-
-        <div class="control-group">
-            <label>Color Pop (Saturation) <span id="val-sat">100%</span></label>
-            <input type="range" id="saturation" min="0" max="200" value="100">
-        </div>
-
-        <div class="control-group">
-            <label>Compression Quality <span id="val-qual">85%</span></label>
-            <input type="range" id="quality" min="10" max="100" value="85">
-        </div>
-
-        <div class="stats" id="statsText"></div>
-
-        <a id="downloadBtn" class="btn">Download Enhanced Image</a>
-    </div>
-</div>
-
-<script>
-    const fileInput = document.getElementById('fileInput');
-    const canvas = document.getElementById('previewCanvas');
-    const ctx = canvas.getContext('2d');
-    const controlsArea = document.getElementById('controlsArea');
-    const statsText = document.getElementById('statsText');
-    const downloadBtn = document.getElementById('downloadBtn');
-
-    // Sliders
-    const sBright = document.getElementById('brightness');
-    const sSat = document.getElementById('saturation');
-    const sQual = document.getElementById('quality');
-
-    // Labels
-    const lBright = document.getElementById('val-bright');
-    const lSat = document.getElementById('val-sat');
-    const lQual = document.getElementById('val-qual');
-
-    let originalImg = new Image();
-    let originalFileSize = 0;
-
-    // 1. Handle File Upload
-    fileInput.addEventListener('change', (e) => {
-        if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            originalFileSize = file.size;
+def load_image():
+    global original_image
+    file_path = filedialog.askopenfilename(
+        title="Select an Image",
+        filetypes=[("Image Files", "*.jpg *.jpeg *.png")]
+    )
+    if file_path:
+        original_image = Image.open(file_path)
+        # Convert to RGB to handle PNGs and ensure consistency
+        if original_image.mode != 'RGB':
+            original_image = original_image.convert('RGB')
             
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                originalImg.onload = () => {
-                    // Reset sliders
-                    sBright.value = 100; lBright.innerText = "100%";
-                    sSat.value = 100; lSat.innerText = "100%";
-                    
-                    // Show interface
-                    canvas.style.display = 'block';
-                    controlsArea.style.display = 'block';
-                    statsText.style.display = 'block';
-                    
-                    renderImage();
-                }
-                originalImg.src = event.target.result;
-            }
-            reader.readAsDataURL(file);
-        }
-    });
+        # Reset sliders and update preview
+        brightness_slider.set(1.0)
+        color_slider.set(1.0)
+        update_preview()
+        btn_save.config(state=tk.NORMAL)
+        status_label.config(text="Image loaded. Adjust and save.")
 
-    // 2. Handle Sliders
-    [sBright, sSat, sQual].forEach(slider => {
-        slider.addEventListener('input', renderImage);
-    });
-
-    // 3. Main Rendering Logic
-    function renderImage() {
-        // Update Label Text
-        lBright.innerText = sBright.value + "%";
-        lSat.innerText = sSat.value + "%";
-        lQual.innerText = sQual.value + "%";
-
-        // Set Canvas Size
-        canvas.width = originalImg.width;
-        canvas.height = originalImg.height;
-
-        // Apply Filters (Brightness & Saturation)
-        // Note: CSS filters use % (e.g. 100%), Canvas context uses string
-        ctx.filter = `brightness(${sBright.value}%) saturate(${sSat.value}%)`;
+def update_preview(*args):
+    global processed_image, tk_image
+    if original_image:
+        # 1. Enhance Brightness
+        enhancer_b = ImageEnhance.Brightness(original_image)
+        processed_image = enhancer_b.enhance(brightness_slider.get())
         
-        // Draw Image
-        ctx.drawImage(originalImg, 0, 0, canvas.width, canvas.height);
-
-        // Generate Compressed Output
-        const qualityDecimal = sQual.value / 100;
-        const dataUrl = canvas.toDataURL('image/jpeg', qualityDecimal);
-
-        // Update Download Link
-        downloadBtn.href = dataUrl;
-        downloadBtn.download = "enhanced-jewelry.jpg";
-
-        // Calculate Size Stats
-        estimateSize(dataUrl);
-    }
-
-    function estimateSize(dataUrl) {
-        // Rough calculation of base64 size in bytes
-        const head = 'data:image/jpeg;base64,';
-        const sizeInBytes = Math.round((dataUrl.length - head.length) * 3 / 4);
+        # 2. Enhance Color (Saturation)
+        enhancer_c = ImageEnhance.Color(processed_image)
+        processed_image = enhancer_c.enhance(color_slider.get())
         
-        const origKB = (originalFileSize / 1024).toFixed(1);
-        const newKB = (sizeInBytes / 1024).toFixed(1);
-        const reduction = (100 - (sizeInBytes / originalFileSize) * 100).toFixed(0);
+        # Resize for preview window (keep aspect ratio)
+        preview_size = (300, 300)
+        img_for_preview = processed_image.copy()
+        img_for_preview.thumbnail(preview_size)
+        
+        # Convert to Tkinter-compatible format
+        tk_image = ImageTk.PhotoImage(img_for_preview)
+        preview_label.config(image=tk_image)
 
-        // Color logic for text
-        let color = reduction > 0 ? "green" : "red";
-        let sign = reduction > 0 ? "-" : "+";
+def save_image():
+    if not processed_image:
+        return
 
-        statsText.innerHTML = `
-            Original: ${origKB} KB <br>
-            New Size: <b>${newKB} KB</b> (<span style="color:${color}">${sign}${Math.abs(reduction)}%</span>)
-        `;
-    }
-</script>
+    try:
+        save_path = filedialog.asksaveasfilename(
+            title="Save Enhanced & Compressed Image",
+            defaultextension=".jpg",
+            filetypes=[("JPEG Image", "*.jpg"), ("PNG Image", "*.png")]
+        )
+        
+        if not save_path:
+            return
 
-</body>
-</html>
+        # --- Compression Logic ---
+        # We use JPEG with quality=85 for the best balance of size and quality.
+        # This is the standard for high-quality web images.
+        processed_image.save(save_path, "JPEG", optimize=True, quality=85)
+
+        # Calculate stats
+        original_size = os.path.getsize(original_image.filename)
+        new_size = os.path.getsize(save_path)
+        reduction = ((original_size - new_size) / original_size) * 100
+        
+        messagebox.showinfo("Success", f"Image saved!\nSize reduced by {int(reduction)}%.")
+
+    except Exception as e:
+        messagebox.showerror("Error", f"An error occurred: {e}")
+
+# --- GUI Setup ---
+app = tk.Tk()
+app.title("Jewelry Photo Enhancer & Compressor")
+app.geometry("400x550")
+
+# Styling
+font_bold = ("Helvetica", 12, "bold")
+font_plain = ("Helvetica", 10)
+
+# 1. Load Button
+btn_load = tk.Button(app, text="1. Select Image", command=load_image, font=font_bold, bg="#e1e1e1", padx=10)
+btn_load.pack(pady=10)
+
+# 2. Preview Area
+preview_frame = tk.Frame(app, width=300, height=300, bg="#f0f0f0")
+preview_frame.pack(pady=5)
+preview_frame.pack_propagate(False) # Don't shrink
+preview_label = tk.Label(preview_frame, text="No image selected", bg="#f0f0f0")
+preview_label.pack(expand=True)
+
+# 3. Enhancement Controls
+controls_frame = tk.LabelFrame(app, text="Enhance Look", font=font_bold, padx=10, pady=10)
+controls_frame.pack(fill="x", padx=20, pady=10)
+
+tk.Label(controls_frame, text="Brightness:", font=font_plain).pack(anchor="w")
+brightness_slider = Scale(controls_frame, from_=0.5, to=1.5, resolution=0.05, orient=HORIZONTAL, command=update_preview)
+brightness_slider.set(1.0) # Default value
+brightness_slider.pack(fill="x")
+
+tk.Label(controls_frame, text="Color Saturation:", font=font_plain).pack(anchor="w")
+color_slider = Scale(controls_frame, from_=0.0, to=2.0, resolution=0.05, orient=HORIZONTAL, command=update_preview)
+color_slider.set(1.0) # Default value
+color_slider.pack(fill="x")
+
+# 4. Save Button
+btn_save = tk.Button(app, text="2. Compress & Save", command=save_image, font=font_bold, bg="#4CAF50", fg="white", padx=10, state=tk.DISABLED)
+btn_save.pack(pady=10)
+
+status_label = tk.Label(app, text="Welcome!", font=font_plain, fg="grey")
+status_label.pack(side="bottom", pady=10)
+
+app.mainloop()
