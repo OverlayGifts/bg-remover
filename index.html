@@ -87,9 +87,15 @@
         .btn-share { background-color: #27ae60; color: white; }
         .btn-share:hover { background-color: #219150; }
 
-        .btn-bg { background-color: #e74c3c; color: white; margin-bottom: 15px; width: 100%; }
+        .btn-bg { background-color: #e74c3c; color: white; margin-bottom: 15px; width: 100%; transition: background-color 0.3s; }
         .btn-bg:hover { background-color: #c0392b; }
-        .btn-bg:disabled { background-color: #e6b0aa; cursor: wait; }
+        
+        /* Disabled Button Style */
+        .btn-bg:disabled { 
+            background-color: #bdc3c7; 
+            cursor: not-allowed; 
+            opacity: 0.7;
+        }
 
         /* Rename Input */
         .rename-input {
@@ -155,9 +161,9 @@
 
     <div class="controls" id="controlsArea">
         
-        <button id="bgBtn" class="btn btn-bg" onclick="handleRemoveBackground()">
+        <button id="bgBtn" class="btn btn-bg" onclick="handleRemoveBackground()" disabled>
             <div id="spinner" class="spinner"></div> 
-            <span id="bgBtnText">✨ Remove Background (AI)</span>
+            <span id="bgBtnText">⏳ Initializing AI... (Please Wait)</span>
         </button>
 
         <div class="control-group">
@@ -190,11 +196,19 @@
 </div>
 
 <script type="module">
-    // This imports the library directly as a module, preventing "undefined" errors
     import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.0.4/+esm';
     
-    // Attach it to the window so our main script can use it
+    // Attach function to window
     window.removeBgAI = removeBackground;
+    
+    // Unlock the button because AI is ready!
+    const btn = document.getElementById('bgBtn');
+    const txt = document.getElementById('bgBtnText');
+    if(btn) {
+        btn.disabled = false;
+        txt.innerText = "✨ Remove Background (AI)";
+        btn.style.backgroundColor = "#e74c3c"; // restore color
+    }
 </script>
 
 <script>
@@ -239,9 +253,17 @@
                     controlsArea.style.display = 'block';
                     statsText.style.display = 'block';
                     bgBtn.style.display = "flex"; 
-                    bgBtn.disabled = false;
-                    bgBtnText.innerText = "✨ Remove Background (AI)";
                     
+                    // Check if AI is already ready from the module script
+                    if (window.removeBgAI) {
+                         bgBtn.disabled = false;
+                         bgBtnText.innerText = "✨ Remove Background (AI)";
+                    } else {
+                        // Keep disabled if still loading
+                         bgBtn.disabled = true;
+                         bgBtnText.innerText = "⏳ Initializing AI... (Please Wait)";
+                    }
+
                     renderImage();
                 }
                 originalImg.src = event.target.result;
@@ -254,20 +276,21 @@
     async function handleRemoveBackground() {
         if (!currentImg) return;
 
-        // Check if library loaded successfully
+        // Double check AI status
         if (!window.removeBgAI) {
-            alert("The AI library is still loading or failed to connect. Please wait a moment or check your internet.");
+            alert("Please wait a few more seconds for the AI to finish loading.");
             return;
         }
 
         bgBtn.disabled = true;
-        bgBtnText.innerText = "Downloading AI Model... (Wait)";
+        bgBtnText.innerText = "Processing... (approx 5-10s)";
         spinner.style.display = "block";
 
         try {
             // Configuration to fetch models from a reliable public server
             const config = {
-                publicPath: "https://cdn.jsdelivr.net/npm/@imgly/background-removal-data@1.0.4/dist/"
+                publicPath: "https://cdn.jsdelivr.net/npm/@imgly/background-removal-data@1.0.4/dist/",
+                debug: true // Enable debug logging
             };
 
             // Run the AI
@@ -278,14 +301,14 @@
             newImg.onload = () => {
                 currentImg = newImg;
                 isTransparent = true;
-                bgBtn.style.display = "none";
+                bgBtn.style.display = "none"; // Remove button after success
                 renderImage();
             };
             newImg.src = url;
 
         } catch (error) {
             console.error(error);
-            alert(`Error: ${error.message}\nIf this persists, the server might be blocking the request.`);
+            alert(`Error: ${error.message}\nTry checking your internet connection.`);
             bgBtn.disabled = false;
             bgBtnText.innerText = "✨ Remove Background (AI)";
             spinner.style.display = "none";
