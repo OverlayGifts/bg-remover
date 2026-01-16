@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jewels-AI Studio (One Click)</title>
+    <title>Jewels-AI Studio (Smart Protect)</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f6f8; color: #333; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         .container { background-color: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 600px; width: 100%; text-align: center; }
@@ -21,23 +21,22 @@
         
         /* Auto Button */
         .btn-auto {
-            background: linear-gradient(135deg, #8e44ad, #c0392b);
+            background: linear-gradient(135deg, #27ae60, #2ecc71);
             color: white; border: none; padding: 15px; width: 100%; border-radius: 8px;
             font-size: 1rem; font-weight: bold; cursor: pointer; margin-bottom: 20px;
-            box-shadow: 0 4px 10px rgba(192, 57, 43, 0.3); transition: transform 0.2s;
+            box-shadow: 0 4px 10px rgba(39, 174, 96, 0.3); transition: transform 0.2s;
         }
         .btn-auto:hover { transform: scale(1.02); }
-        .btn-auto:active { transform: scale(0.98); }
 
         /* Fine Tune Area */
-        .fine-tune { background: #f9f9f9; padding: 15px; border-radius: 8px; border: 1px solid #eee; margin-bottom: 20px; display:none; }
-        .fine-tune-label { font-size: 0.8rem; color: #7f8c8d; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; display: block; font-weight: bold; cursor: pointer; }
+        .fine-tune { background: #fff8e1; padding: 15px; border-radius: 8px; border: 1px solid #ffe082; margin-bottom: 20px; }
         
         #bgThreshold { accent-color: #c0392b; }
+        #bgProtect { accent-color: #f1c40f; } /* Gold color for protection slider */
 
         .btn-row { display: flex; gap: 10px; margin-top: 15px; }
         .btn { padding: 12px; border-radius: 6px; text-decoration: none; font-weight: bold; cursor: pointer; border: none; flex: 1; display: flex; justify-content: center; align-items: center; font-size: 0.9rem; }
-        .btn-share { background-color: #27ae60; color: white; }
+        .btn-share { background-color: #2980b9; color: white; }
         .btn-down { background-color: #2c3e50; color: white; }
         
         .rename-input { width: 100%; padding: 10px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 5px; box-sizing: border-box; font-size: 1rem; }
@@ -51,11 +50,11 @@
 
 <div class="container">
     <h1>Jewels-AI Studio</h1>
-    <p class="subtitle">Single-Click Background Removal</p>
+    <p class="subtitle">Smart Protect Mode: Keeps Gold Safe</p>
 
     <div class="upload-box" onclick="document.getElementById('fileInput').click()">
         <h3>Click to Upload Image</h3>
-        <p style="margin:0; font-size:0.8rem; color:#888;">Auto-detects white background</p>
+        <p style="margin:0; font-size:0.8rem; color:#888;">Best for White Backgrounds</p>
     </div>
     <input type="file" id="fileInput" accept="image/*">
 
@@ -63,17 +62,18 @@
 
     <div class="controls" id="controlsArea">
         
-        <button class="btn-auto" onclick="autoRemove()">⚡ Instant Remove White BG</button>
+        <button class="btn-auto" onclick="autoRemove()">⚡ Auto-Remove (Smart)</button>
 
-        <div class="fine-tune-label" onclick="toggleFineTune()">▼ Show Fine-Tune Settings (Advanced)</div>
         <div class="fine-tune" id="fineTuneBox">
             <div class="control-group">
-                <label style="color: #c0392b;">Cutout Precision <span id="val-thresh">0</span></label>
-                <input type="range" id="bgThreshold" min="0" max="100" value="0">
+                <label style="color: #c0392b;">1. Removal Strength <span id="val-thresh">0</span></label>
+                <input type="range" id="bgThreshold" min="0" max="80" value="0">
+                <p style="margin:2px 0 0 0; font-size:0.75rem; color:#b7950b;">Too high? It eats the gold. Too low? Background stays.</p>
             </div>
             <div class="control-group" style="margin-bottom: 0;">
-                <label style="color: #2c3e50;">Edge Sharpness <span id="val-crisp">1</span></label>
-                <input type="range" id="bgCrisp" min="0" max="10" value="1">
+                <label style="color: #d35400;">2. Gold Protection <span id="val-prot">Medium</span></label>
+                <input type="range" id="bgProtect" min="0" max="50" value="20">
+                <p style="margin:2px 0 0 0; font-size:0.75rem; color:#b7950b;">Increase this if parts of jewelry are disappearing.</p>
             </div>
         </div>
 
@@ -114,10 +114,9 @@
     const statsText = document.getElementById('statsText');
     const downloadBtn = document.getElementById('downloadBtn');
     const filenameInput = document.getElementById('filename');
-    const fineTuneBox = document.getElementById('fineTuneBox');
 
     const sThresh = document.getElementById('bgThreshold');
-    const sCrisp = document.getElementById('bgCrisp');
+    const sProt = document.getElementById('bgProtect');
     const sBright = document.getElementById('brightness');
     const sSat = document.getElementById('saturation');
     const sQual = document.getElementById('quality');
@@ -149,12 +148,13 @@
                     octx.drawImage(tempImg, 0, 0, w, h);
 
                     const data = octx.getImageData(0, 0, w, h).data;
-                    bgColor = { r: data[0], g: data[1], b: data[2] }; // Detect corner color
+                    bgColor = { r: data[0], g: data[1], b: data[2] }; 
 
                     currentImg = new Image();
                     currentImg.onload = () => {
-                        // Reset
-                        sThresh.value = 0; sCrisp.value = 1; 
+                        // Reset to safe defaults
+                        sThresh.value = 0; 
+                        sProt.value = 20; 
                         sBright.value = 100;
                         canvas.style.display = 'block';
                         controlsArea.style.display = 'block';
@@ -169,33 +169,22 @@
         }
     });
 
-    // 2. ONE-CLICK AUTO REMOVE
+    // 2. AUTO REMOVE (Safer)
     function autoRemove() {
-        // We set the threshold to a "safe" standard for white photography (25%)
-        // This usually removes the background without eating the jewelry
-        sThresh.value = 25; 
-        sCrisp.value = 1; // Keep it sharp
-        
-        // Trigger render
+        // Set a safer threshold (15 instead of 25)
+        // And enable High Protection
+        sThresh.value = 18; 
+        sProt.value = 25; 
         renderImage();
     }
 
-    // Toggle Advanced Options
-    function toggleFineTune() {
-        if(fineTuneBox.style.display === 'block') {
-            fineTuneBox.style.display = 'none';
-        } else {
-            fineTuneBox.style.display = 'block';
-        }
-    }
-
     // 3. RENDER LOOP
-    [sThresh, sCrisp, sBright, sSat, sQual].forEach(s => s.addEventListener('input', renderImage));
+    [sThresh, sProt, sBright, sSat, sQual].forEach(s => s.addEventListener('input', renderImage));
     filenameInput.addEventListener('input', updateLink);
 
     function renderImage() {
         document.getElementById('val-thresh').innerText = sThresh.value;
-        document.getElementById('val-crisp').innerText = sCrisp.value;
+        document.getElementById('val-prot').innerText = sProt.value;
         document.getElementById('val-bright').innerText = sBright.value + "%";
         document.getElementById('val-sat').innerText = sSat.value + "%";
         document.getElementById('val-qual').innerText = sQual.value + "%";
@@ -207,31 +196,49 @@
         
         if (sThresh.value > 0) {
             isTransparent = true;
-            sharpRemoveBackground(parseInt(sThresh.value), parseInt(sCrisp.value));
+            // Send both Threshold and Protection values
+            protectedRemoveBackground(parseInt(sThresh.value), parseInt(sProt.value));
         } else {
             isTransparent = false;
         }
         updateLink();
     }
 
-    // RAZOR-SHARP ALGO
-    function sharpRemoveBackground(threshold, crispness) {
+    // SMART ALGORITHM WITH GOLD PROTECTION
+    function protectedRemoveBackground(threshold, protection) {
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
         
-        // Safe Threshold Limit
+        // Threshold Multiplier
         const limit = threshold * 4.5; 
-        const featherRange = crispness * 1.5; 
+        const fade = 5; // Small fade for smoothness
 
         for (let i = 0; i < data.length; i += 4) {
             const r = data[i]; const g = data[i + 1]; const b = data[i + 2];
+            
+            // 1. Calculate Distance from Background Color
             const dist = Math.sqrt((r-bgColor.r)**2 + (g-bgColor.g)**2 + (b-bgColor.b)**2);
 
-            if (dist < limit) {
-                data[i + 3] = 0;
-            } else if (dist < limit + featherRange) {
-                const alpha = (dist - limit) / featherRange;
-                data[i + 3] = Math.floor(alpha * 255);
+            // 2. Calculate "Colorfulness" (Saturation)
+            // Gold has color. White background has almost 0 color.
+            const max = Math.max(r, g, b);
+            const min = Math.min(r, g, b);
+            const saturation = max - min; 
+
+            // LOGIC: 
+            // Only remove if it looks like background (Low distance)
+            // AND it is NOT colorful (Low saturation)
+            
+            // If saturation > protection, we keep it even if it's light!
+            if (saturation > protection) {
+                // Keep pixel (Do nothing)
+            } else {
+                if (dist < limit) {
+                    data[i + 3] = 0; // Cut
+                } else if (dist < limit + fade) {
+                    const alpha = (dist - limit) / fade;
+                    data[i + 3] = Math.floor(alpha * 255); // Smooth edge
+                }
             }
         }
         ctx.putImageData(imageData, 0, 0);
