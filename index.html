@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jewels-AI Studio</title>
-    <script src="https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.0.4/dist/imgly-background-removal.min.js"></script>
+    <title>Jewels-AI Studio (Fast)</title>
+    <script src="https://unpkg.com/@imgly/background-removal@1.0.4/dist/imgly-background-removal.min.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -89,19 +89,8 @@
             transition: all 0.3s; 
         }
         .btn-bg:hover { background-color: #c0392b; }
-        
-        /* Disabled / Loading State */
-        .btn-bg:disabled { 
-            background-color: #95a5a6; 
-            cursor: not-allowed; 
-            opacity: 0.8;
-        }
-
-        /* Error State */
-        .btn-error {
-            background-color: #2c3e50 !important;
-            color: #ecf0f1 !important;
-        }
+        .btn-bg:disabled { background-color: #95a5a6; cursor: not-allowed; opacity: 0.8; }
+        .btn-error { background-color: #34495e !important; color: #fff !important; }
 
         .rename-input {
             width: 100%;
@@ -152,11 +141,11 @@
 
 <div class="container">
     <h1>Jewels-AI Studio</h1>
-    <p class="subtitle">Remove BG, Enhance, Rename & Compress</p>
+    <p class="subtitle">Compress First -> Then Remove BG (Faster)</p>
 
     <div class="upload-box" onclick="document.getElementById('fileInput').click()">
         <h3>Click to Upload Image</h3>
-        <p style="margin:0; font-size:0.8rem; color:#888;">Supports JPG, PNG</p>
+        <p style="margin:0; font-size:0.8rem; color:#888;">Auto-compresses high-res photos</p>
     </div>
     <input type="file" id="fileInput" accept="image/*">
 
@@ -166,7 +155,7 @@
         
         <button id="bgBtn" class="btn btn-bg" onclick="handleRemoveBackground()" disabled>
             <div id="spinner" class="spinner"></div> 
-            <span id="bgBtnText">⏳ Loading AI... (0s)</span>
+            <span id="bgBtnText">⏳ Loading AI...</span>
         </button>
 
         <div class="control-group">
@@ -199,7 +188,7 @@
 </div>
 
 <script>
-    // --- VARIABLES ---
+    // VARIABLES
     const fileInput = document.getElementById('fileInput');
     const canvas = document.getElementById('previewCanvas');
     const ctx = canvas.getContext('2d');
@@ -215,19 +204,16 @@
     const sSat = document.getElementById('saturation');
     const sQual = document.getElementById('quality');
 
-    let originalImg = new Image();
     let currentImg = null;
     let originalFileSize = 0;
+    let compressedFileSize = 0;
     let isTransparent = false;
     let aiReady = false;
 
-    // --- 1. ROBUST AI LOADER ---
-    // This constantly checks if the AI library is loaded
+    // 1. AI LOADER (With new UNPKG link)
     let loadAttempts = 0;
     const checkAI = setInterval(() => {
         loadAttempts++;
-        
-        // Check if imgly exists
         if (typeof imgly !== 'undefined') {
             clearInterval(checkAI);
             aiReady = true;
@@ -237,19 +223,16 @@
                 bgBtn.style.backgroundColor = "#e74c3c";
             }
         } else {
-            // Still loading... update text
             if (bgBtn) bgBtnText.innerText = `⏳ Loading AI... (${(loadAttempts/2).toFixed(1)}s)`;
-            
-            // Timeout after 15 seconds
-            if (loadAttempts > 30) {
+            if (loadAttempts > 40) { // 20 seconds timeout
                 clearInterval(checkAI);
                 bgBtn.classList.add('btn-error');
-                bgBtnText.innerText = "⚠ AI Failed to Load (Network Blocked)";
+                bgBtnText.innerText = "⚠ Network Blocked: Try Mobile Data";
             }
         }
-    }, 500); // Check every 0.5 seconds
+    }, 500);
 
-    // --- 2. FILE UPLOAD ---
+    // 2. HANDLE UPLOAD + AUTO-COMPRESS (STEP 1)
     fileInput.addEventListener('change', (e) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
@@ -260,51 +243,72 @@
 
             const reader = new FileReader();
             reader.onload = (event) => {
-                originalImg.onload = () => {
-                    currentImg = originalImg;
-                    isTransparent = false;
-                    
-                    sBright.value = 100; sSat.value = 100;
-                    
-                    canvas.style.display = 'block';
-                    controlsArea.style.display = 'block';
-                    statsText.style.display = 'block';
-                    bgBtn.style.display = "flex"; 
-                    
-                    // If AI is not ready, keep button disabled
-                    if (!aiReady) {
-                        bgBtn.disabled = true;
-                        if(bgBtnText.innerText.includes("Failed")) {
-                            // Keep failed state
-                        } else {
-                            bgBtnText.innerText = "⏳ Loading AI... (Please Wait)";
-                        }
-                    } else {
-                        bgBtn.disabled = false;
-                        bgBtnText.innerText = "✨ Remove Background (AI)";
+                const tempImg = new Image();
+                tempImg.onload = () => {
+                    // --- COMPRESSION STEP: Resize to max 1080px ---
+                    const maxWidth = 1080;
+                    let newWidth = tempImg.width;
+                    let newHeight = tempImg.height;
+
+                    if (newWidth > maxWidth) {
+                        const ratio = maxWidth / newWidth;
+                        newWidth = maxWidth;
+                        newHeight = tempImg.height * ratio;
                     }
 
-                    renderImage();
+                    // Create offscreen canvas to resize
+                    const oc = document.createElement('canvas');
+                    oc.width = newWidth;
+                    oc.height = newHeight;
+                    const octx = oc.getContext('2d');
+                    octx.drawImage(tempImg, 0, 0, newWidth, newHeight);
+
+                    // Convert back to image object
+                    currentImg = new Image();
+                    currentImg.onload = () => {
+                        isTransparent = false;
+                        sBright.value = 100; sSat.value = 100;
+                        
+                        canvas.style.display = 'block';
+                        controlsArea.style.display = 'block';
+                        statsText.style.display = 'block';
+                        bgBtn.style.display = "flex"; 
+                        
+                        // Estimate compressed size
+                        compressedFileSize = Math.round((oc.toDataURL('image/jpeg', 0.85).length - 22) * 3/4);
+
+                        // Unlock button if AI is ready
+                        if (!aiReady) {
+                            bgBtn.disabled = true;
+                            if(!bgBtnText.innerText.includes("Blocked")) bgBtnText.innerText = "⏳ Loading AI... (Please Wait)";
+                        } else {
+                            bgBtn.disabled = false;
+                            bgBtnText.innerText = "✨ Remove Background (AI)";
+                        }
+
+                        renderImage();
+                    }
+                    currentImg.src = oc.toDataURL('image/jpeg', 0.90); // High quality resize
                 }
-                originalImg.src = event.target.result;
+                tempImg.src = event.target.result;
             }
             reader.readAsDataURL(file);
         }
     });
 
-    // --- 3. BACKGROUND REMOVAL ---
+    // 3. REMOVE BACKGROUND (STEP 2)
     async function handleRemoveBackground() {
         if (!currentImg) return;
         if (!aiReady) { alert("AI is not loaded yet."); return; }
 
         bgBtn.disabled = true;
-        bgBtnText.innerText = "Processing... (Wait 5-10s)";
+        bgBtnText.innerText = "Processing Compressed Img...";
         spinner.style.display = "block";
 
         try {
-            // Use standard config for UMD
+            // Using UNPKG - often bypasses firewalls
             const config = {
-                publicPath: "https://cdn.jsdelivr.net/npm/@imgly/background-removal-data@1.0.4/dist/"
+                publicPath: "https://unpkg.com/@imgly/background-removal-data@1.0.4/dist/"
             };
 
             const blob = await imgly.removeBackground(currentImg, config);
@@ -328,7 +332,7 @@
         }
     }
 
-    // --- 4. SLIDERS & RENDER ---
+    // 4. RENDERING & SAVING
     [sBright, sSat, sQual].forEach(slider => slider.addEventListener('input', renderImage));
     filenameInput.addEventListener('input', updateDownloadLink);
 
@@ -341,7 +345,6 @@
         canvas.height = currentImg.height;
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
         ctx.filter = `brightness(${sBright.value}%) saturate(${sSat.value}%)`;
         ctx.drawImage(currentImg, 0, 0, canvas.width, canvas.height);
 
@@ -351,7 +354,6 @@
     function updateDownloadLink() {
         const format = isTransparent ? 'image/png' : 'image/jpeg';
         const qualityDecimal = sQual.value / 100;
-        
         const dataUrl = canvas.toDataURL(format, qualityDecimal);
 
         let ext = isTransparent ? '.png' : '.jpg';
@@ -369,38 +371,24 @@
         const sizeInBytes = Math.round((dataUrl.length - head.length) * 3 / 4);
         
         const origKB = (originalFileSize / 1024).toFixed(1);
-        const newKB = (sizeInBytes / 1024).toFixed(1);
+        const compKB = (compressedFileSize / 1024).toFixed(1);
+        const finalKB = (sizeInBytes / 1024).toFixed(1);
         
-        statsText.innerHTML = `Original: ${origKB} KB → New: <b>${newKB} KB</b>`;
+        // Show the flow of compression
+        statsText.innerHTML = `Original: ${origKB} KB → Compressed Input: ${compKB} KB → <b>Final: ${finalKB} KB</b>`;
     }
 
-    // --- 5. SHARE ---
     async function shareImage() {
-        if (!navigator.share) {
-            alert("Sharing is not supported on this browser/device.");
-            return;
-        }
-
+        if (!navigator.share) { alert("Sharing not supported on this device."); return; }
         const format = isTransparent ? 'image/png' : 'image/jpeg';
-        const qualityDecimal = sQual.value / 100;
-
         canvas.toBlob(async (blob) => {
             let ext = isTransparent ? '.png' : '.jpg';
             let name = filenameInput.value || "image";
             if (!name.endsWith(ext)) name += ext;
-
             const file = new File([blob], name, { type: format });
-
-            try {
-                await navigator.share({
-                    files: [file],
-                    title: 'Enhanced Image',
-                    text: 'Here is my image from Jewels-AI Studio!'
-                });
-            } catch (err) {
-                console.log("Share cancelled", err);
-            }
-        }, format, qualityDecimal);
+            try { await navigator.share({ files: [file], title: 'Jewels-AI', text: 'My enhanced image' }); } 
+            catch (err) { console.log("Share failed", err); }
+        }, format, sQual.value / 100);
     }
 </script>
 
