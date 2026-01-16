@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Compressor</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #ffffff;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 50px 20px;
+            text-align: center;
+        }
+
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: #2c3e50;
+        }
+
+        p {
+            color: #7f8c8d;
+            margin-bottom: 30px;
+        }
+
+        .upload-container {
+            border: 2px dashed #bdc3c7;
+            padding: 40px;
+            border-radius: 10px;
+            background-color: #f9f9f9;
+            cursor: pointer;
+            transition: border-color 0.3s;
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 500px;
+        }
+
+        .upload-container:hover {
+            border-color: #3498db;
+        }
+
+        /* Hidden actual input */
+        #fileInput {
+            display: none;
+        }
+
+        .btn {
+            background-color: #2c3e50;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 6px;
+            border: none;
+            font-size: 1rem;
+            cursor: pointer;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            background-color: #34495e;
+        }
+
+        #preview-area {
+            margin-top: 30px;
+            display: none; /* Hidden until image is processed */
+            border-top: 1px solid #eee;
+            padding-top: 20px;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        .stats {
+            margin: 10px 0;
+            font-size: 0.9rem;
+            color: #27ae60;
+            font-weight: bold;
+        }
+
+        img.preview {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            margin-bottom: 15px;
+        }
+        
+        .controls {
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Image Compressor</h1>
+    <p>Reduce image size maintaining visual quality (Client-side)</p>
+
+    <div class="upload-container" onclick="document.getElementById('fileInput').click()">
+        <h3>Click to Upload Image</h3>
+        <p style="margin:0; font-size:0.8rem;">Supports JPG, PNG, WEBP</p>
+    </div>
+    <input type="file" id="fileInput" accept="image/*">
+
+    <div id="controls-area" style="display:none;" class="controls">
+        <label for="quality">Quality: <span id="qualityVal">80</span>%</label>
+        <br>
+        <input type="range" id="quality" min="10" max="100" value="80" style="width: 200px;">
+    </div>
+
+    <div id="preview-area">
+        <div class="stats" id="stats-text"></div>
+        <img id="compressed-image" class="preview" alt="Compressed Preview">
+        <br>
+        <a id="download-btn" class="btn" download="compressed-image.jpg">Download Compressed Image</a>
+    </div>
+
+    <script>
+        const fileInput = document.getElementById('fileInput');
+        const qualitySlider = document.getElementById('quality');
+        const qualityVal = document.getElementById('qualityVal');
+        const previewArea = document.getElementById('preview-area');
+        const controlsArea = document.getElementById('controls-area');
+        const compressedImg = document.getElementById('compressed-image');
+        const downloadBtn = document.getElementById('download-btn');
+        const statsText = document.getElementById('stats-text');
+
+        let originalFile = null;
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                originalFile = e.target.files[0];
+                processImage(originalFile, qualitySlider.value / 100);
+                controlsArea.style.display = 'block';
+                previewArea.style.display = 'block';
+            }
+        });
+
+        qualitySlider.addEventListener('input', (e) => {
+            qualityVal.innerText = e.target.value;
+            if (originalFile) {
+                processImage(originalFile, e.target.value / 100);
+            }
+        });
+
+        function processImage(file, quality) {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+
+                    // Draw image on canvas
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                    // Compress (Output as JPEG for best compression)
+                    // You can change 'image/jpeg' to 'image/webp' for even better size
+                    const compressedDataUrl = canvas.toDataURL('image/jpeg', quality);
+
+                    // Update UI
+                    compressedImg.src = compressedDataUrl;
+                    downloadBtn.href = compressedDataUrl;
+
+                    // Calculate Size Savings
+                    const originalSize = (file.size / 1024).toFixed(2);
+                    
+                    // Estimate compressed size from base64 length
+                    const head = 'data:image/jpeg;base64,';
+                    const sizeInBytes = Math.round((compressedDataUrl.length - head.length) * 3 / 4);
+                    const compressedSize = (sizeInBytes / 1024).toFixed(2);
+                    const percent = (100 - (sizeInBytes / file.size) * 100).toFixed(1);
+
+                    statsText.innerText = `Original: ${originalSize} KB → Compressed: ${compressedSize} KB (-${percent}%)`;
+                }
+            }
+        }
+    </script>
+</body>
+</html>
