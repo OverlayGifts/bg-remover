@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jewels-AI Studio</title>
+    <script src="https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.0.4/dist/imgly-background-removal.min.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -29,7 +30,6 @@
         h1 { margin-bottom: 5px; color: #2c3e50; }
         p.subtitle { color: #7f8c8d; margin-bottom: 25px; font-size: 0.9rem; }
 
-        /* Upload Box */
         .upload-box {
             border: 2px dashed #bdc3c7;
             padding: 30px;
@@ -42,9 +42,8 @@
         .upload-box:hover { border-color: #3498db; background-color: #f0f8ff; }
         #fileInput { display: none; }
 
-        /* Controls */
         .controls {
-            display: none; /* Hidden until image loads */
+            display: none;
             text-align: left;
             margin-top: 20px;
             border-top: 1px solid #eee;
@@ -60,12 +59,7 @@
             accent-color: #3498db;
         }
 
-        /* Action Buttons */
-        .btn-row {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
+        .btn-row { display: flex; gap: 10px; margin-top: 15px; }
 
         .btn {
             padding: 12px;
@@ -87,17 +81,28 @@
         .btn-share { background-color: #27ae60; color: white; }
         .btn-share:hover { background-color: #219150; }
 
-        .btn-bg { background-color: #e74c3c; color: white; margin-bottom: 15px; width: 100%; transition: background-color 0.3s; }
+        .btn-bg { 
+            background-color: #e74c3c; 
+            color: white; 
+            margin-bottom: 15px; 
+            width: 100%; 
+            transition: all 0.3s; 
+        }
         .btn-bg:hover { background-color: #c0392b; }
         
-        /* Disabled Button Style (When AI is loading) */
+        /* Disabled / Loading State */
         .btn-bg:disabled { 
-            background-color: #bdc3c7; 
+            background-color: #95a5a6; 
             cursor: not-allowed; 
-            opacity: 0.7;
+            opacity: 0.8;
         }
 
-        /* Rename Input */
+        /* Error State */
+        .btn-error {
+            background-color: #2c3e50 !important;
+            color: #ecf0f1 !important;
+        }
+
         .rename-input {
             width: 100%;
             padding: 10px;
@@ -108,7 +113,6 @@
             font-size: 1rem;
         }
 
-        /* Preview Canvas */
         canvas {
             max-width: 100%;
             height: auto;
@@ -130,7 +134,6 @@
             display: none;
         }
 
-        /* Loading Spinner */
         .spinner {
             display: none;
             width: 20px;
@@ -163,7 +166,7 @@
         
         <button id="bgBtn" class="btn btn-bg" onclick="handleRemoveBackground()" disabled>
             <div id="spinner" class="spinner"></div> 
-            <span id="bgBtnText">⏳ Initializing AI... (Please Wait)</span>
+            <span id="bgBtnText">⏳ Loading AI... (0s)</span>
         </button>
 
         <div class="control-group">
@@ -195,23 +198,8 @@
     </div>
 </div>
 
-<script type="module">
-    import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.0.4/+esm';
-    
-    // Attach function to window so the main script can use it
-    window.removeBgAI = removeBackground;
-    
-    // Unlock the button because AI is ready!
-    const btn = document.getElementById('bgBtn');
-    const txt = document.getElementById('bgBtnText');
-    if(btn) {
-        btn.disabled = false;
-        txt.innerText = "✨ Remove Background (AI)";
-        btn.style.backgroundColor = "#e74c3c"; 
-    }
-</script>
-
 <script>
+    // --- VARIABLES ---
     const fileInput = document.getElementById('fileInput');
     const canvas = document.getElementById('previewCanvas');
     const ctx = canvas.getContext('2d');
@@ -231,8 +219,37 @@
     let currentImg = null;
     let originalFileSize = 0;
     let isTransparent = false;
+    let aiReady = false;
 
-    // 1. Handle File Upload
+    // --- 1. ROBUST AI LOADER ---
+    // This constantly checks if the AI library is loaded
+    let loadAttempts = 0;
+    const checkAI = setInterval(() => {
+        loadAttempts++;
+        
+        // Check if imgly exists
+        if (typeof imgly !== 'undefined') {
+            clearInterval(checkAI);
+            aiReady = true;
+            if (bgBtn) {
+                bgBtn.disabled = false;
+                bgBtnText.innerText = "✨ Remove Background (AI)";
+                bgBtn.style.backgroundColor = "#e74c3c";
+            }
+        } else {
+            // Still loading... update text
+            if (bgBtn) bgBtnText.innerText = `⏳ Loading AI... (${(loadAttempts/2).toFixed(1)}s)`;
+            
+            // Timeout after 15 seconds
+            if (loadAttempts > 30) {
+                clearInterval(checkAI);
+                bgBtn.classList.add('btn-error');
+                bgBtnText.innerText = "⚠ AI Failed to Load (Network Blocked)";
+            }
+        }
+    }, 500); // Check every 0.5 seconds
+
+    // --- 2. FILE UPLOAD ---
     fileInput.addEventListener('change', (e) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
@@ -254,13 +271,17 @@
                     statsText.style.display = 'block';
                     bgBtn.style.display = "flex"; 
                     
-                    // Check if AI is already ready from the module script
-                    if (window.removeBgAI) {
-                         bgBtn.disabled = false;
-                         bgBtnText.innerText = "✨ Remove Background (AI)";
+                    // If AI is not ready, keep button disabled
+                    if (!aiReady) {
+                        bgBtn.disabled = true;
+                        if(bgBtnText.innerText.includes("Failed")) {
+                            // Keep failed state
+                        } else {
+                            bgBtnText.innerText = "⏳ Loading AI... (Please Wait)";
+                        }
                     } else {
-                         bgBtn.disabled = true;
-                         bgBtnText.innerText = "⏳ Initializing AI... (Please Wait)";
+                        bgBtn.disabled = false;
+                        bgBtnText.innerText = "✨ Remove Background (AI)";
                     }
 
                     renderImage();
@@ -271,54 +292,46 @@
         }
     });
 
-    // 2. Remove Background Logic
+    // --- 3. BACKGROUND REMOVAL ---
     async function handleRemoveBackground() {
         if (!currentImg) return;
-
-        // Double check AI status
-        if (!window.removeBgAI) {
-            alert("Please wait a few more seconds for the AI to finish loading.");
-            return;
-        }
+        if (!aiReady) { alert("AI is not loaded yet."); return; }
 
         bgBtn.disabled = true;
-        bgBtnText.innerText = "Processing... (approx 5-10s)";
+        bgBtnText.innerText = "Processing... (Wait 5-10s)";
         spinner.style.display = "block";
 
         try {
-            // Configuration to fetch models from a reliable public server
+            // Use standard config for UMD
             const config = {
-                publicPath: "https://cdn.jsdelivr.net/npm/@imgly/background-removal-data@1.0.4/dist/",
-                debug: true 
+                publicPath: "https://cdn.jsdelivr.net/npm/@imgly/background-removal-data@1.0.4/dist/"
             };
 
-            // Run the AI
-            const blob = await window.removeBgAI(currentImg, config);
+            const blob = await imgly.removeBackground(currentImg, config);
             const url = URL.createObjectURL(blob);
             
             const newImg = new Image();
             newImg.onload = () => {
                 currentImg = newImg;
                 isTransparent = true;
-                bgBtn.style.display = "none"; // Remove button after success
+                bgBtn.style.display = "none";
                 renderImage();
             };
             newImg.src = url;
 
         } catch (error) {
             console.error(error);
-            alert(`Error: ${error.message}\nTry checking your internet connection.`);
+            alert("Error: " + error.message);
             bgBtn.disabled = false;
             bgBtnText.innerText = "✨ Remove Background (AI)";
             spinner.style.display = "none";
         }
     }
 
-    // 3. Handle Sliders & Rename
+    // --- 4. SLIDERS & RENDER ---
     [sBright, sSat, sQual].forEach(slider => slider.addEventListener('input', renderImage));
     filenameInput.addEventListener('input', updateDownloadLink);
 
-    // 4. Main Rendering Logic
     function renderImage() {
         document.getElementById('val-bright').innerText = sBright.value + "%";
         document.getElementById('val-sat').innerText = sSat.value + "%";
@@ -361,7 +374,7 @@
         statsText.innerHTML = `Original: ${origKB} KB → New: <b>${newKB} KB</b>`;
     }
 
-    // 5. Share Function
+    // --- 5. SHARE ---
     async function shareImage() {
         if (!navigator.share) {
             alert("Sharing is not supported on this browser/device.");
@@ -385,7 +398,7 @@
                     text: 'Here is my image from Jewels-AI Studio!'
                 });
             } catch (err) {
-                console.log("Share cancelled or failed", err);
+                console.log("Share cancelled", err);
             }
         }, format, qualityDecimal);
     }
