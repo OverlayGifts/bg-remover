@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jewels-AI Studio</title>
-    <script src="https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.0.4/dist/imgly-background-removal.min.js"></script>
+    <title>Jewelry Photo Enhancer</title>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -61,48 +60,6 @@
             accent-color: #3498db;
         }
 
-        /* Action Buttons */
-        .btn-row {
-            display: flex;
-            gap: 10px;
-            margin-top: 15px;
-        }
-
-        .btn {
-            padding: 12px;
-            border-radius: 6px;
-            text-decoration: none;
-            font-weight: bold;
-            cursor: pointer;
-            border: none;
-            flex: 1;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 0.9rem;
-        }
-
-        .btn-primary { background-color: #2c3e50; color: white; }
-        .btn-primary:hover { background-color: #34495e; }
-
-        .btn-share { background-color: #27ae60; color: white; }
-        .btn-share:hover { background-color: #219150; }
-
-        .btn-bg { background-color: #e74c3c; color: white; margin-bottom: 15px; width: 100%; }
-        .btn-bg:hover { background-color: #c0392b; }
-        .btn-bg:disabled { background-color: #e6b0aa; cursor: wait; }
-
-        /* Rename Input */
-        .rename-input {
-            width: 100%;
-            padding: 10px;
-            margin-bottom: 10px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-            box-sizing: border-box;
-            font-size: 1rem;
-        }
-
         /* Preview Canvas */
         canvas {
             max-width: 100%;
@@ -111,9 +68,9 @@
             margin-top: 10px;
             border: 1px solid #ddd;
             display: none;
-            background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAOwgAADsIBFShKgAAAABp0RVh0U29mdHdhcmUAUGFpbnQuTkVUIHYzLjUuMTAw9HKhAAAAFElEQVQ4T2NTgIP/OPABRf//DQApldl5OHdCDAAAAABJRU5ErkJggg=='); /* Checkerboard for transparency */
         }
 
+        /* Stats & Buttons */
         .stats {
             margin-top: 15px;
             font-size: 0.85rem;
@@ -125,26 +82,30 @@
             display: none;
         }
 
-        /* Loading Spinner */
-        .spinner {
-            display: none;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255,255,255,0.3);
-            border-radius: 50%;
-            border-top-color: #fff;
-            animation: spin 1s ease-in-out infinite;
-            margin-right: 10px;
+        .btn {
+            background-color: #2c3e50;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 6px;
+            text-decoration: none;
+            display: inline-block;
+            margin-top: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            border: none;
+            width: 100%;
+            box-sizing: border-box;
         }
-        @keyframes spin { to { transform: rotate(360deg); } }
+        .btn:hover { background-color: #34495e; }
+        .btn:disabled { background-color: #bdc3c7; cursor: not-allowed; }
 
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>Jewels-AI Studio</h1>
-    <p class="subtitle">Remove BG, Enhance, Rename & Compress</p>
+    <h1>Jewelry Photo Enhancer</h1>
+    <p class="subtitle">Enhance brightness & color, then compress.</p>
 
     <div class="upload-box" onclick="document.getElementById('fileInput').click()">
         <h3>Click to Upload Image</h3>
@@ -156,37 +117,24 @@
 
     <div class="controls" id="controlsArea">
         
-        <button id="bgBtn" class="btn btn-bg" onclick="removeBackground()">
-            <div id="spinner" class="spinner"></div> 
-            <span id="bgBtnText">✨ Remove Background (AI)</span>
-        </button>
-
         <div class="control-group">
             <label>Brightness <span id="val-bright">100%</span></label>
             <input type="range" id="brightness" min="50" max="150" value="100">
         </div>
 
         <div class="control-group">
-            <label>Color Pop <span id="val-sat">100%</span></label>
+            <label>Color Pop (Saturation) <span id="val-sat">100%</span></label>
             <input type="range" id="saturation" min="0" max="200" value="100">
         </div>
 
         <div class="control-group">
-            <label>Compression <span id="val-qual">85%</span></label>
+            <label>Compression Quality <span id="val-qual">85%</span></label>
             <input type="range" id="quality" min="10" max="100" value="85">
-        </div>
-
-        <div style="text-align: left; margin-top: 20px;">
-            <label style="margin-bottom: 5px;">Filename:</label>
-            <input type="text" id="filename" class="rename-input" placeholder="Enter file name">
         </div>
 
         <div class="stats" id="statsText"></div>
 
-        <div class="btn-row">
-            <button class="btn btn-share" onclick="shareImage()">🔗 Share</button>
-            <a id="downloadBtn" class="btn btn-primary">⬇ Download</a>
-        </div>
+        <a id="downloadBtn" class="btn">Download Enhanced Image</a>
     </div>
 </div>
 
@@ -197,20 +145,19 @@
     const controlsArea = document.getElementById('controlsArea');
     const statsText = document.getElementById('statsText');
     const downloadBtn = document.getElementById('downloadBtn');
-    const filenameInput = document.getElementById('filename');
-    const bgBtn = document.getElementById('bgBtn');
-    const bgBtnText = document.getElementById('bgBtnText');
-    const spinner = document.getElementById('spinner');
 
     // Sliders
     const sBright = document.getElementById('brightness');
     const sSat = document.getElementById('saturation');
     const sQual = document.getElementById('quality');
 
+    // Labels
+    const lBright = document.getElementById('val-bright');
+    const lSat = document.getElementById('val-sat');
+    const lQual = document.getElementById('val-qual');
+
     let originalImg = new Image();
-    let currentImg = null; // The image currently being processed (original or bg-removed)
     let originalFileSize = 0;
-    let isTransparent = false;
 
     // 1. Handle File Upload
     fileInput.addEventListener('change', (e) => {
@@ -218,19 +165,12 @@
             const file = e.target.files[0];
             originalFileSize = file.size;
             
-            // Set default filename
-            const nameWithoutExt = file.name.split('.').slice(0, -1).join('.');
-            filenameInput.value = nameWithoutExt + "_enhanced";
-
             const reader = new FileReader();
             reader.onload = (event) => {
                 originalImg.onload = () => {
-                    currentImg = originalImg;
-                    isTransparent = false;
-                    
                     // Reset sliders
-                    sBright.value = 100; 
-                    sSat.value = 100;
+                    sBright.value = 100; lBright.innerText = "100%";
+                    sSat.value = 100; lSat.innerText = "100%";
                     
                     // Show interface
                     canvas.style.display = 'block';
@@ -245,121 +185,58 @@
         }
     });
 
-    // 2. Remove Background Logic
-    async function removeBackground() {
-        if (!currentImg) return;
+    // 2. Handle Sliders
+    [sBright, sSat, sQual].forEach(slider => {
+        slider.addEventListener('input', renderImage);
+    });
 
-        // UI Updates
-        bgBtn.disabled = true;
-        bgBtnText.innerText = "Processing... (approx 5-10s)";
-        spinner.style.display = "block";
-
-        try {
-            // Run imgly AI
-            const blob = await imgly.removeBackground(currentImg);
-            const url = URL.createObjectURL(blob);
-            
-            const newImg = new Image();
-            newImg.onload = () => {
-                currentImg = newImg;
-                isTransparent = true; // Switch mode to PNG
-                
-                // UI Reset
-                bgBtn.style.display = "none"; // Hide button after use
-                renderImage();
-                alert("Background Removed Successfully!");
-            };
-            newImg.src = url;
-
-        } catch (error) {
-            console.error(error);
-            alert("Error removing background. Please try a simpler image or use Chrome/Safari.");
-            bgBtn.disabled = false;
-            bgBtnText.innerText = "✨ Remove Background (AI)";
-            spinner.style.display = "none";
-        }
-    }
-
-    // 3. Handle Sliders & Rename
-    [sBright, sSat, sQual].forEach(slider => slider.addEventListener('input', renderImage));
-    filenameInput.addEventListener('input', updateDownloadLink);
-
-    // 4. Main Rendering Logic
+    // 3. Main Rendering Logic
     function renderImage() {
-        // Update labels
-        document.getElementById('val-bright').innerText = sBright.value + "%";
-        document.getElementById('val-sat').innerText = sSat.value + "%";
-        document.getElementById('val-qual').innerText = sQual.value + "%";
+        // Update Label Text
+        lBright.innerText = sBright.value + "%";
+        lSat.innerText = sSat.value + "%";
+        lQual.innerText = sQual.value + "%";
 
-        canvas.width = currentImg.width;
-        canvas.height = currentImg.height;
+        // Set Canvas Size
+        canvas.width = originalImg.width;
+        canvas.height = originalImg.height;
 
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // Apply filters
+        // Apply Filters (Brightness & Saturation)
+        // Note: CSS filters use % (e.g. 100%), Canvas context uses string
         ctx.filter = `brightness(${sBright.value}%) saturate(${sSat.value}%)`;
-        ctx.drawImage(currentImg, 0, 0, canvas.width, canvas.height);
-
-        updateDownloadLink();
-    }
-
-    function updateDownloadLink() {
-        // Choose format based on transparency
-        const format = isTransparent ? 'image/png' : 'image/jpeg';
-        const qualityDecimal = sQual.value / 100;
         
-        // Convert canvas to URL
-        const dataUrl = canvas.toDataURL(format, qualityDecimal);
+        // Draw Image
+        ctx.drawImage(originalImg, 0, 0, canvas.width, canvas.height);
 
-        // Update Download Button
-        let ext = isTransparent ? '.png' : '.jpg';
-        let name = filenameInput.value || "image";
-        if (!name.endsWith(ext)) name += ext;
+        // Generate Compressed Output
+        const qualityDecimal = sQual.value / 100;
+        const dataUrl = canvas.toDataURL('image/jpeg', qualityDecimal);
 
+        // Update Download Link
         downloadBtn.href = dataUrl;
-        downloadBtn.download = name;
+        downloadBtn.download = "enhanced-jewelry.jpg";
 
-        // Calculate Size
+        // Calculate Size Stats
         estimateSize(dataUrl);
     }
 
     function estimateSize(dataUrl) {
-        const head = 'data:image/jpeg;base64,'; // rough estimate length
+        // Rough calculation of base64 size in bytes
+        const head = 'data:image/jpeg;base64,';
         const sizeInBytes = Math.round((dataUrl.length - head.length) * 3 / 4);
         
         const origKB = (originalFileSize / 1024).toFixed(1);
         const newKB = (sizeInBytes / 1024).toFixed(1);
-        
-        statsText.innerHTML = `Original: ${origKB} KB → New: <b>${newKB} KB</b>`;
-    }
+        const reduction = (100 - (sizeInBytes / originalFileSize) * 100).toFixed(0);
 
-    // 5. Share Function
-    async function shareImage() {
-        if (!navigator.share) {
-            alert("Sharing is not supported on this browser/device.");
-            return;
-        }
+        // Color logic for text
+        let color = reduction > 0 ? "green" : "red";
+        let sign = reduction > 0 ? "-" : "+";
 
-        const format = isTransparent ? 'image/png' : 'image/jpeg';
-        const qualityDecimal = sQual.value / 100;
-
-        canvas.toBlob(async (blob) => {
-            let ext = isTransparent ? '.png' : '.jpg';
-            let name = filenameInput.value || "image";
-            if (!name.endsWith(ext)) name += ext;
-
-            const file = new File([blob], name, { type: format });
-
-            try {
-                await navigator.share({
-                    files: [file],
-                    title: 'Enhanced Image',
-                    text: 'Here is my image from Jewels-AI Studio!'
-                });
-            } catch (err) {
-                console.log("Share cancelled or failed", err);
-            }
-        }, format, qualityDecimal);
+        statsText.innerHTML = `
+            Original: ${origKB} KB <br>
+            New Size: <b>${newKB} KB</b> (<span style="color:${color}">${sign}${Math.abs(reduction)}%</span>)
+        `;
     }
 </script>
 
