@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Jewels-AI Studio (Manual)</title>
+    <title>Jewels-AI Studio (Pro Edit)</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f4f6f8; color: #333; margin: 0; padding: 20px; display: flex; flex-direction: column; align-items: center; }
         .container { background-color: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); max-width: 600px; width: 100%; text-align: center; }
@@ -19,8 +19,10 @@
         label { font-weight: bold; font-size: 0.9rem; display: flex; justify-content: space-between; }
         input[type=range] { width: 100%; margin-top: 5px; accent-color: #3498db; }
         
-        /* Specific slider for BG removal */
-        #bgThreshold { accent-color: #e74c3c; }
+        /* Pro Removal Sliders */
+        .remove-zone { background: #fff0f0; padding: 15px; border-radius: 8px; border: 1px solid #ffcccc; margin-bottom: 20px; }
+        #bgTolerance { accent-color: #e74c3c; }
+        #bgSmooth { accent-color: #e67e22; }
 
         .btn-row { display: flex; gap: 10px; margin-top: 15px; }
         .btn { padding: 12px; border-radius: 6px; text-decoration: none; font-weight: bold; cursor: pointer; border: none; flex: 1; display: flex; justify-content: center; align-items: center; font-size: 0.9rem; }
@@ -38,11 +40,11 @@
 
 <div class="container">
     <h1>Jewels-AI Studio</h1>
-    <p class="subtitle">Firewall-Proof Mode: No Downloads Needed</p>
+    <p class="subtitle">Smart Eraser: Auto-Color Detect + Smooth Edges</p>
 
     <div class="upload-box" onclick="document.getElementById('fileInput').click()">
         <h3>Click to Upload Image</h3>
-        <p style="margin:0; font-size:0.8rem; color:#888;">Auto-compresses to Web Size</p>
+        <p style="margin:0; font-size:0.8rem; color:#888;">Works instantly offline (No Firewall issues)</p>
     </div>
     <input type="file" id="fileInput" accept="image/*">
 
@@ -50,10 +52,18 @@
 
     <div class="controls" id="controlsArea">
         
-        <div class="control-group" style="background: #fdf2f2; padding: 10px; border-radius: 8px; border: 1px solid #fadbd8;">
-            <label style="color: #c0392b;">✂️ Remove White BG <span id="val-bg">OFF</span></label>
-            <input type="range" id="bgThreshold" min="0" max="100" value="0">
-            <p style="margin: 5px 0 0 0; font-size: 0.75rem; color: #7f8c8d;">Slide right until white background disappears.</p>
+        <div class="remove-zone">
+            <div class="control-group">
+                <label style="color: #c0392b;">1. Erase Strength <span id="val-tol">OFF</span></label>
+                <input type="range" id="bgTolerance" min="0" max="150" value="0">
+                <p style="margin: 2px 0 0 0; font-size: 0.75rem; color: #999;">Move Right until background vanishes.</p>
+            </div>
+            
+            <div class="control-group" style="margin-bottom: 0;">
+                <label style="color: #d35400;">2. Edge Softness <span id="val-smooth">0px</span></label>
+                <input type="range" id="bgSmooth" min="0" max="50" value="10">
+                <p style="margin: 2px 0 0 0; font-size: 0.75rem; color: #999;">Increase to remove jagged lines.</p>
+            </div>
         </div>
 
         <div class="control-group">
@@ -94,7 +104,9 @@
     const downloadBtn = document.getElementById('downloadBtn');
     const filenameInput = document.getElementById('filename');
 
-    const sBg = document.getElementById('bgThreshold');
+    // Sliders
+    const sTol = document.getElementById('bgTolerance');
+    const sSmooth = document.getElementById('bgSmooth');
     const sBright = document.getElementById('brightness');
     const sSat = document.getElementById('saturation');
     const sQual = document.getElementById('quality');
@@ -102,25 +114,25 @@
     let currentImg = null;
     let originalFileSize = 0;
     let isTransparent = false;
+    let bgColor = { r: 255, g: 255, b: 255 }; // Default white
 
-    // 1. UPLOAD & COMPRESS
+    // 1. UPLOAD & DETECT BACKGROUND COLOR
     fileInput.addEventListener('change', (e) => {
         if (e.target.files && e.target.files[0]) {
             const file = e.target.files[0];
             originalFileSize = file.size;
             
             const name = file.name.split('.').slice(0, -1).join('.');
-            filenameInput.value = name + "_edited";
+            filenameInput.value = name + "_pro";
 
             const reader = new FileReader();
             reader.onload = (event) => {
                 const tempImg = new Image();
                 tempImg.onload = () => {
-                    // Resize to max 1080px (Safe Size)
+                    // Compress to safe size
                     const maxWidth = 1080;
                     let w = tempImg.width;
                     let h = tempImg.height;
-                    
                     if (w > maxWidth) {
                         h = h * (maxWidth / w);
                         w = maxWidth;
@@ -131,11 +143,18 @@
                     const octx = oc.getContext('2d');
                     octx.drawImage(tempImg, 0, 0, w, h);
 
+                    // AUTO-DETECT BACKGROUND COLOR from corners
+                    const data = octx.getImageData(0, 0, w, h).data;
+                    // Check top-left pixel color
+                    bgColor = { r: data[0], g: data[1], b: data[2] };
+                    console.log("Detected BG Color:", bgColor);
+
                     currentImg = new Image();
                     currentImg.onload = () => {
-                        // Reset sliders
-                        sBg.value = 0; sBright.value = 100; sSat.value = 100;
-                        isTransparent = false;
+                        // Reset defaults
+                        sTol.value = 0; 
+                        sSmooth.value = 10;
+                        sBright.value = 100;
                         
                         canvas.style.display = 'block';
                         controlsArea.style.display = 'block';
@@ -151,31 +170,30 @@
         }
     });
 
-    // 2. MAIN RENDER LOOP
-    [sBg, sBright, sSat, sQual].forEach(slider => slider.addEventListener('input', renderImage));
+    // 2. RENDER LOOP
+    [sTol, sSmooth, sBright, sSat, sQual].forEach(s => s.addEventListener('input', renderImage));
     filenameInput.addEventListener('input', updateLink);
 
     function renderImage() {
-        // Update Labels
-        document.getElementById('val-bg').innerText = sBg.value > 0 ? sBg.value + "%" : "OFF";
+        // UI Updates
+        document.getElementById('val-tol').innerText = sTol.value > 0 ? sTol.value : "OFF";
+        document.getElementById('val-smooth').innerText = sSmooth.value + "px";
         document.getElementById('val-bright').innerText = sBright.value + "%";
         document.getElementById('val-sat').innerText = sSat.value + "%";
         document.getElementById('val-qual').innerText = sQual.value + "%";
 
-        // Setup Canvas
+        // Draw Base Image
         canvas.width = currentImg.width;
         canvas.height = currentImg.height;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Apply Filters first
+        
         ctx.filter = `brightness(${sBright.value}%) saturate(${sSat.value}%)`;
         ctx.drawImage(currentImg, 0, 0, canvas.width, canvas.height);
         
-        // --- THE MAGIC ERASER (No AI Needed) ---
-        // If slider is moved, remove white pixels
-        if (sBg.value > 0) {
+        // --- SMART BACKGROUND REMOVAL ---
+        if (sTol.value > 0) {
             isTransparent = true;
-            removeWhiteBackground(parseInt(sBg.value));
+            smartRemoveBackground(parseInt(sTol.value), parseInt(sSmooth.value));
         } else {
             isTransparent = false;
         }
@@ -183,20 +201,37 @@
         updateLink();
     }
 
-    // This function manually erases white pixels
-    function removeWhiteBackground(tolerance) {
+    // --- 3. THE SMART ALGORITHM ---
+    function smartRemoveBackground(tolerance, softness) {
         const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
         const data = imageData.data;
-        const limit = 255 - (tolerance * 2.55); // Convert % to 0-255 scale (Higher tolerance = darker whites removed)
-
+        
+        // Calculate tolerance squared to avoid slow Math.sqrt inside loop
+        // Standard Euclidean distance logic
+        
         for (let i = 0; i < data.length; i += 4) {
             const r = data[i];
             const g = data[i + 1];
             const b = data[i + 2];
 
-            // If pixel is bright enough (White/Light Grey)
-            if (r > limit && g > limit && b > limit) {
-                data[i + 3] = 0; // Set Alpha to 0 (Transparent)
+            // Calculate distance from the Detected Background Color
+            const dist = Math.sqrt(
+                Math.pow(r - bgColor.r, 2) +
+                Math.pow(g - bgColor.g, 2) +
+                Math.pow(b - bgColor.b, 2)
+            );
+
+            // Logic:
+            // 1. If distance < tolerance -> Fully Transparent
+            // 2. If distance is just slightly above tolerance -> Semi Transparent (Soft Edge)
+            
+            if (dist < tolerance) {
+                data[i + 3] = 0; // Transparent
+            } else if (dist < tolerance + softness) {
+                // Feathering zone
+                // Calculate how far we are into the softness zone (0.0 to 1.0)
+                let alpha = (dist - tolerance) / softness;
+                data[i + 3] = Math.floor(alpha * 255); 
             }
         }
         ctx.putImageData(imageData, 0, 0);
@@ -214,12 +249,11 @@
         downloadBtn.href = dataUrl;
         downloadBtn.download = name;
 
-        // Size estimate
+        // Size
         const head = 'data:image/jpeg;base64,';
         const size = Math.round((dataUrl.length - head.length) * 3 / 4);
         const kbs = (size / 1024).toFixed(1);
         const orig = (originalFileSize / 1024).toFixed(1);
-        
         statsText.innerHTML = `Original: ${orig} KB → New: <b>${kbs} KB</b>`;
     }
 
