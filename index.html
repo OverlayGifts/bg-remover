@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Jewels-AI Studio</title>
-    <script src="https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.0.4/dist/imgly-background-removal.min.js"></script>
     <style>
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -156,7 +155,7 @@
 
     <div class="controls" id="controlsArea">
         
-        <button id="bgBtn" class="btn btn-bg" onclick="removeBackground()">
+        <button id="bgBtn" class="btn btn-bg" onclick="handleRemoveBackground()">
             <div id="spinner" class="spinner"></div> 
             <span id="bgBtnText">✨ Remove Background (AI)</span>
         </button>
@@ -190,6 +189,14 @@
     </div>
 </div>
 
+<script type="module">
+    // This imports the library directly as a module, preventing "undefined" errors
+    import { removeBackground } from 'https://cdn.jsdelivr.net/npm/@imgly/background-removal@1.0.4/+esm';
+    
+    // Attach it to the window so our main script can use it
+    window.removeBgAI = removeBackground;
+</script>
+
 <script>
     const fileInput = document.getElementById('fileInput');
     const canvas = document.getElementById('previewCanvas');
@@ -202,7 +209,6 @@
     const bgBtnText = document.getElementById('bgBtnText');
     const spinner = document.getElementById('spinner');
 
-    // Sliders
     const sBright = document.getElementById('brightness');
     const sSat = document.getElementById('saturation');
     const sQual = document.getElementById('quality');
@@ -227,8 +233,7 @@
                     currentImg = originalImg;
                     isTransparent = false;
                     
-                    sBright.value = 100; 
-                    sSat.value = 100;
+                    sBright.value = 100; sSat.value = 100;
                     
                     canvas.style.display = 'block';
                     controlsArea.style.display = 'block';
@@ -245,28 +250,34 @@
         }
     });
 
-    // 2. Remove Background Logic (FIXED SERVER LINK)
-    async function removeBackground() {
+    // 2. Remove Background Logic
+    async function handleRemoveBackground() {
         if (!currentImg) return;
+
+        // Check if library loaded successfully
+        if (!window.removeBgAI) {
+            alert("The AI library is still loading or failed to connect. Please wait a moment or check your internet.");
+            return;
+        }
 
         bgBtn.disabled = true;
         bgBtnText.innerText = "Downloading AI Model... (Wait)";
         spinner.style.display = "block";
 
         try {
-            // FIX: Using 'jsdelivr' instead of 'img.ly' for better reliability
+            // Configuration to fetch models from a reliable public server
             const config = {
                 publicPath: "https://cdn.jsdelivr.net/npm/@imgly/background-removal-data@1.0.4/dist/"
             };
 
-            const blob = await imgly.removeBackground(currentImg, config);
+            // Run the AI
+            const blob = await window.removeBgAI(currentImg, config);
             const url = URL.createObjectURL(blob);
             
             const newImg = new Image();
             newImg.onload = () => {
                 currentImg = newImg;
                 isTransparent = true;
-                
                 bgBtn.style.display = "none";
                 renderImage();
             };
@@ -274,7 +285,7 @@
 
         } catch (error) {
             console.error(error);
-            alert(`Error: ${error.message}. \nTry using Google Chrome or check your internet.`);
+            alert(`Error: ${error.message}\nIf this persists, the server might be blocking the request.`);
             bgBtn.disabled = false;
             bgBtnText.innerText = "✨ Remove Background (AI)";
             spinner.style.display = "none";
