@@ -111,7 +111,7 @@
             margin-top: 10px;
             border: 1px solid #ddd;
             display: none;
-            background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAOwgAADsIBFShKgAAAABp0RVh0U29mdHdhcmUAUGFpbnQuTkVUIHYzLjUuMTAw9HKhAAAAFElEQVQ4T2NTgIP/OPABRf//DQApldl5OHdCDAAAAABJRU5ErkJggg=='); /* Checkerboard for transparency */
+            background-image: url('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABGdBTUEAALGPC/xhBQAAAAlwSFlzAAAOwgAADsIBFShKgAAAABp0RVh0U29mdHdhcmUAUGFpbnQuTkVUIHYzLjUuMTAw9HKhAAAAFElEQVQ4T2NTgIP/OPABRf//DQApldl5OHdCDAAAAABJRU5ErkJggg==');
         }
 
         .stats {
@@ -208,7 +208,7 @@
     const sQual = document.getElementById('quality');
 
     let originalImg = new Image();
-    let currentImg = null; // The image currently being processed (original or bg-removed)
+    let currentImg = null;
     let originalFileSize = 0;
     let isTransparent = false;
 
@@ -218,7 +218,6 @@
             const file = e.target.files[0];
             originalFileSize = file.size;
             
-            // Set default filename
             const nameWithoutExt = file.name.split('.').slice(0, -1).join('.');
             filenameInput.value = nameWithoutExt + "_enhanced";
 
@@ -228,14 +227,15 @@
                     currentImg = originalImg;
                     isTransparent = false;
                     
-                    // Reset sliders
                     sBright.value = 100; 
                     sSat.value = 100;
                     
-                    // Show interface
                     canvas.style.display = 'block';
                     controlsArea.style.display = 'block';
                     statsText.style.display = 'block';
+                    bgBtn.style.display = "flex"; // Show bg button again for new image
+                    bgBtn.disabled = false;
+                    bgBtnText.innerText = "✨ Remove Background (AI)";
                     
                     renderImage();
                 }
@@ -245,35 +245,38 @@
         }
     });
 
-    // 2. Remove Background Logic
+    // 2. Remove Background Logic (FIXED)
     async function removeBackground() {
         if (!currentImg) return;
 
-        // UI Updates
         bgBtn.disabled = true;
         bgBtnText.innerText = "Processing... (approx 5-10s)";
         spinner.style.display = "block";
 
         try {
-            // Run imgly AI
-            const blob = await imgly.removeBackground(currentImg);
+            // FIX: Explicitly point to the CDN for model assets
+            const config = {
+                publicPath: "https://static.img.ly/npm/imgly-background-removal-data/1.0.4/dist/"
+            };
+
+            // Run imgly AI with the fixed config
+            const blob = await imgly.removeBackground(currentImg, config);
             const url = URL.createObjectURL(blob);
             
             const newImg = new Image();
             newImg.onload = () => {
                 currentImg = newImg;
-                isTransparent = true; // Switch mode to PNG
+                isTransparent = true;
                 
-                // UI Reset
-                bgBtn.style.display = "none"; // Hide button after use
+                bgBtn.style.display = "none";
                 renderImage();
-                alert("Background Removed Successfully!");
+                // alert("Background Removed Successfully!");
             };
             newImg.src = url;
 
         } catch (error) {
             console.error(error);
-            alert("Error removing background. Please try a simpler image or use Chrome/Safari.");
+            alert("Error: Check console for details. Usually indicates a network block on the model files.");
             bgBtn.disabled = false;
             bgBtnText.innerText = "✨ Remove Background (AI)";
             spinner.style.display = "none";
@@ -286,7 +289,6 @@
 
     // 4. Main Rendering Logic
     function renderImage() {
-        // Update labels
         document.getElementById('val-bright').innerText = sBright.value + "%";
         document.getElementById('val-sat').innerText = sSat.value + "%";
         document.getElementById('val-qual').innerText = sQual.value + "%";
@@ -296,7 +298,6 @@
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         
-        // Apply filters
         ctx.filter = `brightness(${sBright.value}%) saturate(${sSat.value}%)`;
         ctx.drawImage(currentImg, 0, 0, canvas.width, canvas.height);
 
@@ -304,14 +305,11 @@
     }
 
     function updateDownloadLink() {
-        // Choose format based on transparency
         const format = isTransparent ? 'image/png' : 'image/jpeg';
         const qualityDecimal = sQual.value / 100;
         
-        // Convert canvas to URL
         const dataUrl = canvas.toDataURL(format, qualityDecimal);
 
-        // Update Download Button
         let ext = isTransparent ? '.png' : '.jpg';
         let name = filenameInput.value || "image";
         if (!name.endsWith(ext)) name += ext;
@@ -319,12 +317,11 @@
         downloadBtn.href = dataUrl;
         downloadBtn.download = name;
 
-        // Calculate Size
         estimateSize(dataUrl);
     }
 
     function estimateSize(dataUrl) {
-        const head = 'data:image/jpeg;base64,'; // rough estimate length
+        const head = 'data:image/jpeg;base64,';
         const sizeInBytes = Math.round((dataUrl.length - head.length) * 3 / 4);
         
         const origKB = (originalFileSize / 1024).toFixed(1);
