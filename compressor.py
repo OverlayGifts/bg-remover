@@ -1,98 +1,120 @@
 import tkinter as tk
-from tkinter import filedialog, messagebox
-from PIL import Image
+from tkinter import filedialog, messagebox, Scale, HORIZONTAL
+from PIL import Image, ImageEnhance, ImageTk
 import os
 
-def compress_image():
-    # 1. Open file dialog to select the image
+# Global variables to store image objects
+original_image = None
+processed_image = None
+tk_image = None
+
+def load_image():
+    global original_image
     file_path = filedialog.askopenfilename(
         title="Select an Image",
         filetypes=[("Image Files", "*.jpg *.jpeg *.png")]
     )
-    
-    if not file_path:
-        return  # User cancelled
+    if file_path:
+        original_image = Image.open(file_path)
+        # Convert to RGB to handle PNGs and ensure consistency
+        if original_image.mode != 'RGB':
+            original_image = original_image.convert('RGB')
+            
+        # Reset sliders and update preview
+        brightness_slider.set(1.0)
+        color_slider.set(1.0)
+        update_preview()
+        btn_save.config(state=tk.NORMAL)
+        status_label.config(text="Image loaded. Adjust and save.")
+
+def update_preview(*args):
+    global processed_image, tk_image
+    if original_image:
+        # 1. Enhance Brightness
+        enhancer_b = ImageEnhance.Brightness(original_image)
+        processed_image = enhancer_b.enhance(brightness_slider.get())
+        
+        # 2. Enhance Color (Saturation)
+        enhancer_c = ImageEnhance.Color(processed_image)
+        processed_image = enhancer_c.enhance(color_slider.get())
+        
+        # Resize for preview window (keep aspect ratio)
+        preview_size = (300, 300)
+        img_for_preview = processed_image.copy()
+        img_for_preview.thumbnail(preview_size)
+        
+        # Convert to Tkinter-compatible format
+        tk_image = ImageTk.PhotoImage(img_for_preview)
+        preview_label.config(image=tk_image)
+
+def save_image():
+    if not processed_image:
+        return
 
     try:
-        # 2. Open the image using Pillow
-        img = Image.open(file_path)
-        
-        # Get original file size for comparison
-        original_size = os.path.getsize(file_path)
-        
-        # 3. Prepare output filename (e.g., image_compressed.jpg)
-        file_dir, file_name = os.path.split(file_path)
-        name, ext = os.path.splitext(file_name)
         save_path = filedialog.asksaveasfilename(
-            initialdir=file_dir,
-            title="Save Compressed Image",
-            initialfile=f"{name}_compressed{ext}",
-            defaultextension=ext,
-            filetypes=[("Image Files", "*.jpg *.jpeg *.png")]
+            title="Save Enhanced & Compressed Image",
+            defaultextension=".jpg",
+            filetypes=[("JPEG Image", "*.jpg"), ("PNG Image", "*.png")]
         )
         
         if not save_path:
-            return # User cancelled save
+            return
 
-        # 4. Compression Logic
-        # For JPEGs: 'quality=85' is the sweet spot (great look, low size)
-        # For PNGs: 'optimize=True' cleans up data without losing pixels
-        
-        if ext.lower() in ['.jpg', '.jpeg']:
-            img.save(save_path, "JPEG", optimize=True, quality=85)
-        elif ext.lower() == '.png':
-            # PNG is lossless, so we use optimize to remove metadata/unused colors
-            # To get massive PNG reduction, we can convert to P mode (256 colors) 
-            # if slight color loss is acceptable. For now, we keep it safe.
-            img = img.convert('RGB') # Convert to RGB to safely save as JPEG if user switches ext
-            img.save(save_path, "JPEG", optimize=True, quality=85) 
-            # Note: Saving complex photos as JPEG is usually better for size than PNG.
-        else:
-            img.save(save_path, optimize=True, quality=85)
+        # --- Compression Logic ---
+        # We use JPEG with quality=85 for the best balance of size and quality.
+        # This is the standard for high-quality web images.
+        processed_image.save(save_path, "JPEG", optimize=True, quality=85)
 
-        # 5. Calculate and show results
+        # Calculate stats
+        original_size = os.path.getsize(original_image.filename)
         new_size = os.path.getsize(save_path)
-        saved_kb = (original_size - new_size) / 1024
-        reduction_percent = ((original_size - new_size) / original_size) * 100
+        reduction = ((original_size - new_size) / original_size) * 100
         
-        status_label.config(
-            text=f"Success!\nReduced by {reduction_percent:.1f}%\nSaved {saved_kb:.1f} KB",
-            fg="green"
-        )
-        messagebox.showinfo("Done", f"Image saved successfully!\nSize reduced by {int(reduction_percent)}%.")
+        messagebox.showinfo("Success", f"Image saved!\nSize reduced by {int(reduction)}%.")
 
     except Exception as e:
         messagebox.showerror("Error", f"An error occurred: {e}")
 
 # --- GUI Setup ---
 app = tk.Tk()
-app.title("Image Compressor Tool")
-app.geometry("400x250")
+app.title("Jewelry Photo Enhancer & Compressor")
+app.geometry("400x550")
 
 # Styling
-title_font = ("Helvetica", 16, "bold")
-text_font = ("Helvetica", 10)
+font_bold = ("Helvetica", 12, "bold")
+font_plain = ("Helvetica", 10)
 
-# Widgets
-label_title = tk.Label(app, text="Smart Image Compressor", font=title_font, pady=20)
-label_title.pack()
+# 1. Load Button
+btn_load = tk.Button(app, text="1. Select Image", command=load_image, font=font_bold, bg="#e1e1e1", padx=10)
+btn_load.pack(pady=10)
 
-btn_compress = tk.Button(
-    app, 
-    text="Select & Compress Image", 
-    command=compress_image, 
-    bg="#4CAF50", 
-    fg="white", 
-    font=("Helvetica", 12, "bold"),
-    padx=20, 
-    pady=10
-)
-btn_compress.pack(pady=10)
+# 2. Preview Area
+preview_frame = tk.Frame(app, width=300, height=300, bg="#f0f0f0")
+preview_frame.pack(pady=5)
+preview_frame.pack_propagate(False) # Don't shrink
+preview_label = tk.Label(preview_frame, text="No image selected", bg="#f0f0f0")
+preview_label.pack(expand=True)
 
-status_label = tk.Label(app, text="Ready to compress...", font=text_font, fg="grey")
-status_label.pack(pady=20)
+# 3. Enhancement Controls
+controls_frame = tk.LabelFrame(app, text="Enhance Look", font=font_bold, padx=10, pady=10)
+controls_frame.pack(fill="x", padx=20, pady=10)
 
-footer = tk.Label(app, text="Maintains visual quality while reducing size.", font=("Helvetica", 8))
-footer.pack(side="bottom", pady=10)
+tk.Label(controls_frame, text="Brightness:", font=font_plain).pack(anchor="w")
+brightness_slider = Scale(controls_frame, from_=0.5, to=1.5, resolution=0.05, orient=HORIZONTAL, command=update_preview)
+brightness_slider.set(1.0) # Default value
+brightness_slider.pack(fill="x")
+
+tk.Label(controls_frame, text="Color Saturation:", font=font_plain).pack(anchor="w")
+color_slider = Scale(controls_frame, from_=0.0, to=2.0, resolution=0.05, orient=HORIZONTAL, command=update_preview)
+color_slider.set(1.0) # Default value
+color_slider.pack(fill="x")
+
+# 4. Save Button
+btn_save = tk.Button(app, text="2. Compress & Save", command=save_image, font=font_bold, bg="#4CAF50", fg="white", padx=10, state=tk.DISABLED)
+btn_save.pack(pady=10)
+
+status_label = tk.Label(app, text="Welcome!", font=font_plain, fg="grey")
+status_label.pack(side="bottom", pady=10)
 
 app.mainloop()
