@@ -233,7 +233,7 @@
                     canvas.style.display = 'block';
                     controlsArea.style.display = 'block';
                     statsText.style.display = 'block';
-                    bgBtn.style.display = "flex"; // Show bg button again for new image
+                    bgBtn.style.display = "flex"; 
                     bgBtn.disabled = false;
                     bgBtnText.innerText = "✨ Remove Background (AI)";
                     
@@ -245,21 +245,20 @@
         }
     });
 
-    // 2. Remove Background Logic (FIXED)
+    // 2. Remove Background Logic (FIXED SERVER LINK)
     async function removeBackground() {
         if (!currentImg) return;
 
         bgBtn.disabled = true;
-        bgBtnText.innerText = "Processing... (approx 5-10s)";
+        bgBtnText.innerText = "Downloading AI Model... (Wait)";
         spinner.style.display = "block";
 
         try {
-            // FIX: Explicitly point to the CDN for model assets
+            // FIX: Using 'jsdelivr' instead of 'img.ly' for better reliability
             const config = {
-                publicPath: "https://static.img.ly/npm/imgly-background-removal-data/1.0.4/dist/"
+                publicPath: "https://cdn.jsdelivr.net/npm/@imgly/background-removal-data@1.0.4/dist/"
             };
 
-            // Run imgly AI with the fixed config
             const blob = await imgly.removeBackground(currentImg, config);
             const url = URL.createObjectURL(blob);
             
@@ -270,13 +269,12 @@
                 
                 bgBtn.style.display = "none";
                 renderImage();
-                // alert("Background Removed Successfully!");
             };
             newImg.src = url;
 
         } catch (error) {
             console.error(error);
-            alert("Error: Check console for details. Usually indicates a network block on the model files.");
+            alert(`Error: ${error.message}. \nTry using Google Chrome or check your internet.`);
             bgBtn.disabled = false;
             bgBtnText.innerText = "✨ Remove Background (AI)";
             spinner.style.display = "none";
